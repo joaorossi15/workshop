@@ -2,52 +2,104 @@
   const CFG = window.WORKSHOP_CONFIG || {};
   const API = (CFG.APPS_SCRIPT_URL || '').trim();
 
-  const roundInfo = {
-    1:{theme:'Adequação e benefício', title:'Faz sentido usar um agente aqui?'},
-    2:{theme:'Autonomia e dados', title:'Quanto poder damos ao agente?'},
-    3:{theme:'Riscos e impactos', title:'O piloto começou. O que pode dar errado?'},
-    4:{theme:'Controles e governança', title:'Como tornar esse agente aceitável?'},
-    5:{theme:'Piloto, monitoramento e recomendação', title:'Qual é sua decisão final?'}
+  // ---------------------------------------------------------------------------
+  // Metadados ESPELHADOS do app.js real.
+  // IMPORTANTE: quando uma pergunta mudar no app.js, altere aqui também.
+  // ---------------------------------------------------------------------------
+  const rounds = {
+    1: {
+      title: 'Faz sentido usar um agente aqui?',
+      theme: 'Adequação e benefício',
+      questions: [
+        {id:'r1_problem', title:'Qual é o problema principal que esse projeto tenta resolver?', type:'single'},
+        {id:'r1_benefit', title:'Qual seria o principal benefício esperado?', type:'single'},
+        {id:'r1_needed', title:'Um agente de IA é realmente necessário?', type:'single'},
+        {id:'r1_initial', title:'Com o que você sabe agora, qual é sua recomendação?', type:'single'}
+      ]
+    },
+    2: {
+      title: 'Quanto poder damos ao agente?',
+      theme: 'Autonomia e dados',
+      questions: [
+        {
+          id:'r2_actions',
+          title:'Para cada ação, qual nível de autonomia você permitiria?',
+          type:'matrix',
+          rows:[
+            'Identificar o assunto',
+            'Sugerir a unidade responsável',
+            'Classificar a urgência',
+            'Encaminhar automaticamente',
+            'Preparar uma resposta',
+            'Enviar a resposta ao cidadão'
+          ]
+        },
+        {id:'r2_data', title:'Quais fontes o agente poderia acessar?', type:'multi'},
+        {id:'r2_review', title:'Em que momento a revisão humana deve ser obrigatória?', type:'multi'}
+      ]
+    },
+    3: {
+      title: 'O piloto começou. O que pode dar errado?',
+      theme: 'Riscos e impactos',
+      questions: [
+        {id:'r3_grave', title:'Qual incidente você considera mais grave?', type:'single'},
+        {id:'r3_affected', title:'Quem pode ser prejudicado nesse cenário?', type:'multi'},
+        {id:'r3_worst', title:'Qual seria o pior resultado plausível?', type:'text'},
+        {id:'r3_action', title:'Depois desses incidentes, o que você faria agora?', type:'single'}
+      ]
+    },
+    4: {
+      title: 'Como tornar esse agente aceitável?',
+      theme: 'Controles e governança',
+      questions: [
+        {id:'r4_controls', title:'Quais controles você considera indispensáveis?', type:'multi'},
+        {id:'r4_forbidden', title:'Que ação o agente não deveria realizar de forma autônoma?', type:'single'},
+        {id:'r4_responsible', title:'Quem deve responder pelo resultado final?', type:'single'},
+        {id:'r4_document', title:'O que deve ser documentado?', type:'multi'},
+        {id:'r4_transparency', title:'Como o uso da IA deve ser comunicado?', type:'single'}
+      ]
+    },
+    5: {
+      title: 'Qual é sua decisão final?',
+      theme: 'Piloto, monitoramento e recomendação',
+      questions: [
+        {id:'r5_test', title:'Como você testaria a próxima versão?', type:'single'},
+        {id:'r5_monitor', title:'O que deve ser monitorado?', type:'multi'},
+        {id:'r5_final', title:'Recomendação final', type:'single'},
+        {id:'r5_condition', title:'Em uma frase: qual condição você considera mais importante para esse agente?', type:'text'}
+      ]
+    }
   };
 
-  const canonicalOrder = [
-    'r1_problem','r1_benefit','r1_needed','r1_initial',
-    'r2_actions__0','r2_actions__1','r2_actions__2','r2_actions__3','r2_actions__4','r2_actions__5','r2_data','r2_review',
-    'r3_grave','r3_affected','r3_worst','r3_action',
-    'r4_controls','r4_forbidden','r4_responsible','r4_document','r4_transparency',
-    'r5_test','r5_monitor','r5_final','r5_condition'
-  ];
+  // Converte a estrutura do app.js na sequência exata de slides.
+  // A matriz da Rodada 2 é salva pelo app.js como r2_actions__0 ... __5,
+  // portanto cada linha vira um gráfico separado para facilitar a discussão.
+  const slideDefinitions = [];
+  Object.entries(rounds).forEach(([roundNumber, round]) => {
+    round.questions.forEach(q => {
+      if (q.type === 'matrix') {
+        q.rows.forEach((row, index) => {
+          slideDefinitions.push({
+            round: Number(roundNumber),
+            questionId: `${q.id}__${index}`,
+            title: `${q.title} — ${row}`,
+            shortTitle: `Autonomia — ${row}`,
+            type: 'single'
+          });
+        });
+      } else {
+        slideDefinitions.push({
+          round: Number(roundNumber),
+          questionId: q.id,
+          title: q.title,
+          shortTitle: q.title,
+          type: q.type
+        });
+      }
+    });
+  });
 
-  const labels = {
-    r1_problem:'Qual é o problema principal que esse projeto tenta resolver?',
-    r1_benefit:'Qual seria o principal benefício esperado?',
-    r1_needed:'Um agente de IA é realmente necessário?',
-    r1_initial:'Com o que você sabe agora, qual é sua recomendação?',
-    r2_actions__0:'Autonomia — Identificar o assunto',
-    r2_actions__1:'Autonomia — Sugerir a unidade responsável',
-    r2_actions__2:'Autonomia — Classificar a urgência',
-    r2_actions__3:'Autonomia — Encaminhar automaticamente',
-    r2_actions__4:'Autonomia — Preparar uma resposta',
-    r2_actions__5:'Autonomia — Enviar a resposta ao cidadão',
-    r2_data:'Quais fontes o agente poderia acessar?',
-    r2_review:'Em que momento a revisão humana deve ser obrigatória?',
-    r3_grave:'Qual incidente você considera mais grave?',
-    r3_affected:'Quem pode ser prejudicado nesse cenário?',
-    r3_worst:'Qual seria o pior resultado plausível?',
-    r3_action:'Depois desses incidentes, o que você faria agora?',
-    r4_controls:'Quais controles você considera indispensáveis?',
-    r4_forbidden:'Que ação o agente não deveria realizar de forma autônoma?',
-    r4_responsible:'Quem deve responder pelo resultado final?',
-    r4_document:'O que deve ser documentado?',
-    r4_transparency:'Como o uso da IA deve ser comunicado?',
-    r5_test:'Como você testaria a próxima versão?',
-    r5_monitor:'O que deve ser monitorado?',
-    r5_final:'Recomendação final',
-    r5_condition:'Qual condição você considera mais importante para esse agente?'
-  };
-
-  const openQuestions = new Set(['r3_worst','r5_condition']);
-  const questionRound = qid => Number((/^r(\d)_/.exec(qid)||[])[1] || 0);
+  const definitionById = Object.fromEntries(slideDefinitions.map(x => [x.questionId, x]));
 
   let state = null;
   let slides = [];
@@ -56,149 +108,333 @@
   const $ = id => document.getElementById(id);
   $('workshopTitle').textContent = CFG.WORKSHOP_TITLE || 'Agente em produção?';
 
-  function esc(v){ return String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c])); }
-  function setStatus(text, live=false){ $('connectionStatus').textContent=text; $('connectionStatus').classList.toggle('live',live); }
-  function splitAnswer(answer){ return String(answer).split(' || ').map(x=>x.trim()).filter(Boolean); }
+  function esc(v){
+    return String(v ?? '').replace(/[&<>'"]/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'
+    }[c]));
+  }
 
-  // Comunicação direta com o Apps Script.
-  // Usa POST com text/plain para manter a requisição simples e evitar preflight CORS.
+  function setStatus(text, live=false){
+    $('connectionStatus').textContent = text;
+    $('connectionStatus').classList.toggle('live', live);
+  }
+
+  function splitAnswer(answer){
+    return String(answer ?? '')
+      .split(' || ')
+      .map(x => x.trim())
+      .filter(Boolean);
+  }
+
+  // ---------------------------------------------------------------------------
+  // MESMA comunicação usada pelo app.js que já está funcionando.
+  // ---------------------------------------------------------------------------
   async function call(payload){
-    if(!API){ return demoCall(payload); }
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify(payload)
-    });
+    if(!API) return demoCall(payload);
+
+    let res;
+    try {
+      res = await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      throw new Error('Falha de rede ao contatar o Apps Script: ' + err.message);
+    }
+
     if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
+
     let data;
-    try{
+    try {
       data = await res.json();
-    }catch(_){
+    } catch (_) {
       throw new Error('O Apps Script retornou uma resposta inválida.');
     }
-    if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
+
+    if(!data || data.ok === false){
+      throw new Error((data && data.error) || 'Erro no servidor');
+    }
     return data;
   }
 
   function demoCall(payload){
     if(payload.action === 'state'){
+      const demoRound = Number(localStorage.getItem('workshop_demo_round') || '1');
       return Promise.resolve({
         ok:true,
-        currentRound:Number(localStorage.getItem('workshop_demo_round') || '0'),
+        currentRound:demoRound,
         sessionId:'demo',
-        status:'live'
+        status:demoRound === 6 ? 'finished' : 'live'
       });
     }
+
     if(payload.action === 'results'){
       const arr = JSON.parse(localStorage.getItem('workshop_demo_responses') || '[]');
       const round = Number(payload.round || 0);
       const rows = arr.filter(x => Number(x.round) === round);
-      const grouped = {};
-      const participants = new Set();
-      rows.forEach(x => {
-        participants.add(x.participantId || x.participant || 'demo');
-        const qid = x.questionId || x.question || '';
-        if(!qid) return;
-        if(!grouped[qid]) grouped[qid] = [];
-        grouped[qid].push({answer:x.answer ?? x.value ?? ''});
+      const participantIds = new Set();
+      const questions = {};
+
+      rows.forEach(submission => {
+        participantIds.add(submission.participantId || 'demo');
+        (submission.answers || []).forEach(answer => {
+          const qid = String(answer.questionId || '');
+          if(!qid) return;
+          if(!questions[qid]){
+            questions[qid] = {
+              questionId: qid,
+              questionLabel: answer.questionLabel || '',
+              answers: []
+            };
+          }
+          questions[qid].answers.push({
+            participantId: submission.participantId || 'demo',
+            answer: String(answer.answer ?? '')
+          });
+        });
       });
+
       return Promise.resolve({
         ok:true,
-        participantCount:participants.size,
-        questions:Object.entries(grouped).map(([questionId,answers]) => ({questionId,answers}))
+        sessionId:'demo',
+        round,
+        participantCount:participantIds.size,
+        questions:Object.values(questions)
       });
     }
+
     return Promise.resolve({ok:true});
   }
 
   async function loadAll(){
-    $('loadingState').classList.remove('hidden'); $('emptyState').classList.add('hidden'); $('slide').classList.add('hidden');
+    $('loadingState').classList.remove('hidden');
+    $('emptyState').classList.add('hidden');
+    $('slide').classList.add('hidden');
     setStatus('consultando...');
-    try{
+
+    try {
       state = await call({action:'state'});
-      const results = await Promise.all([1,2,3,4,5].map(round => call({action:'results',sessionId:state.sessionId,round:String(round)})));
-      slides = [];
-      results.forEach((data,idx)=>{
-        const round = idx+1;
-        (data.questions||[]).forEach(q => slides.push({...q,round,participantCount:data.participantCount||0}));
+
+      // Busca todas as rodadas, não somente a atual, pois a página serve para
+      // discutir a oficina completa depois de cada conjunto de respostas.
+      const roundResults = await Promise.all(
+        [1,2,3,4,5].map(round =>
+          call({action:'results', sessionId:state.sessionId, round:String(round)})
+        )
+      );
+
+      const resultByQuestion = {};
+      const participantCountByRound = {};
+
+      roundResults.forEach((data, idx) => {
+        const round = idx + 1;
+        participantCountByRound[round] = Number(data.participantCount || 0);
+        (data.questions || []).forEach(q => {
+          resultByQuestion[q.questionId] = q;
+        });
       });
-      slides.sort((a,b)=>canonicalOrder.indexOf(a.questionId)-canonicalOrder.indexOf(b.questionId));
+
+      // Usa as definições do app.js como fonte da ordem. Perguntas ainda sem
+      // respostas também aparecem, mas mostram "Sem respostas" — assim a ordem
+      // do slideshow nunca muda durante a oficina.
+      slides = slideDefinitions.map(def => {
+        const received = resultByQuestion[def.questionId] || {};
+        return {
+          ...def,
+          questionLabel: received.questionLabel || def.title,
+          answers: Array.isArray(received.answers) ? received.answers : [],
+          participantCount: participantCountByRound[def.round] || 0
+        };
+      });
+
       $('loadingState').classList.add('hidden');
-      if(!slides.length){ $('emptyState').classList.remove('hidden'); setStatus('sem respostas'); return; }
-      current = Math.min(current,slides.length-1);
-      buildSelect(); buildOverview(); render();
+
+      // Se absolutamente nenhuma resposta foi registrada ainda.
+      const totalAnswers = slides.reduce((sum,s) => sum + s.answers.length, 0);
+      if(totalAnswers === 0){
+        $('emptyState').classList.remove('hidden');
+        setStatus('sem respostas');
+        return;
+      }
+
+      // Se veio um #N na URL, mantém o slide ao atualizar dados.
+      const hashIndex = Number(location.hash.replace('#','')) - 1;
+      if(Number.isInteger(hashIndex) && hashIndex >= 0 && hashIndex < slides.length){
+        current = hashIndex;
+      } else {
+        current = Math.min(current, slides.length - 1);
+      }
+
+      buildSelect();
+      buildOverview();
+      render();
       $('slide').classList.remove('hidden');
-      setStatus('dados atualizados',true);
-    }catch(err){
-      $('loadingState').classList.add('hidden'); $('emptyState').classList.remove('hidden');
-      $('emptyState').innerHTML=`<div class="presentation-empty-icon">!</div><h1>Não foi possível carregar os resultados</h1><p>${esc(err.message)}</p>`;
-      setStatus('erro'); console.error(err);
+      setStatus('dados atualizados', true);
+
+    } catch (err) {
+      $('loadingState').classList.add('hidden');
+      $('emptyState').classList.remove('hidden');
+      $('emptyState').innerHTML = `
+        <div class="presentation-empty-icon">!</div>
+        <h1>Não foi possível carregar os resultados</h1>
+        <p>${esc(err.message)}</p>`;
+      setStatus('erro');
+      console.error(err);
     }
   }
 
   function buildSelect(){
-    $('slideSelect').innerHTML = slides.map((s,i)=>`<option value="${i}">${i+1}. R${s.round} — ${esc(labels[s.questionId]||s.questionLabel||s.questionId)}</option>`).join('');
+    $('slideSelect').innerHTML = slides.map((s,i) =>
+      `<option value="${i}">${i+1}. R${s.round} — ${esc(s.shortTitle)}</option>`
+    ).join('');
   }
 
   function buildOverview(){
-    $('overviewGrid').innerHTML=slides.map((s,i)=>`<button class="overview-item" data-index="${i}" type="button"><div class="ov-round">Rodada ${s.round} · ${esc(roundInfo[s.round]?.theme||'')}</div><div class="ov-title">${esc(labels[s.questionId]||s.questionLabel||s.questionId)}</div></button>`).join('');
-    $('overviewGrid').querySelectorAll('.overview-item').forEach(b=>b.onclick=()=>{ current=Number(b.dataset.index); closeOverview(); render(); });
+    $('overviewGrid').innerHTML = slides.map((s,i) => `
+      <button class="overview-item" data-index="${i}" type="button">
+        <div class="ov-round">Rodada ${s.round} · ${esc(rounds[s.round]?.theme || '')}</div>
+        <div class="ov-title">${esc(s.shortTitle)}</div>
+      </button>`).join('');
+
+    $('overviewGrid').querySelectorAll('.overview-item').forEach(button => {
+      button.onclick = () => {
+        current = Number(button.dataset.index);
+        closeOverview();
+        render();
+      };
+    });
   }
 
   function render(){
     if(!slides.length) return;
-    const s=slides[current]; const round=s.round || questionRound(s.questionId);
-    $('roundBadge').textContent=`Rodada ${round}`;
-    $('roundTheme').textContent=roundInfo[round]?.theme||'';
-    $('questionTitle').textContent=labels[s.questionId]||s.questionLabel||s.questionId;
-    $('participantCount').textContent=`${s.participantCount||0} participante${Number(s.participantCount)===1?'':'s'} responderam nesta rodada`;
-    $('slideIndex').textContent=current+1; $('slideTotal').textContent=slides.length;
-    $('sessionCode').textContent=state?.sessionId ? `Sessão ${state.sessionId}` : '';
-    $('slideSelect').value=String(current);
-    $('prevBtn').disabled=current===0; $('nextBtn').disabled=current===slides.length-1;
-    $('visualization').innerHTML = openQuestions.has(s.questionId) ? renderOpen(s) : renderChart(s);
-    history.replaceState(null,'',`#${current+1}`);
+
+    const s = slides[current];
+    $('roundBadge').textContent = `Rodada ${s.round}`;
+    $('roundTheme').textContent = rounds[s.round]?.theme || '';
+    $('questionTitle').textContent = s.shortTitle;
+
+    // participantCount é o total que respondeu à rodada. answers.length é o
+    // total efetivo desta pergunta. Como as perguntas são obrigatórias, devem
+    // coincidir; exibimos o efetivo para evitar números enganosos se houver
+    // dados antigos/incompletos na planilha.
+    const answered = s.answers.length;
+    const roundTotal = Number(s.participantCount || 0);
+    $('participantCount').textContent = answered
+      ? `${answered} participante${answered === 1 ? '' : 's'} responderam esta pergunta${roundTotal && roundTotal !== answered ? ` · ${roundTotal} na rodada` : ''}`
+      : `Nenhuma resposta registrada para esta pergunta${roundTotal ? ` · ${roundTotal} participante${roundTotal === 1 ? '' : 's'} na rodada` : ''}`;
+
+    $('slideIndex').textContent = current + 1;
+    $('slideTotal').textContent = slides.length;
+    $('sessionCode').textContent = state?.sessionId ? `Sessão ${state.sessionId}` : '';
+    $('slideSelect').value = String(current);
+    $('prevBtn').disabled = current === 0;
+    $('nextBtn').disabled = current === slides.length - 1;
+
+    $('visualization').innerHTML = s.type === 'text'
+      ? renderOpen(s)
+      : renderChart(s);
+
+    history.replaceState(null, '', `#${current + 1}`);
   }
 
   function renderChart(s){
-    const counts={};
-    (s.answers||[]).forEach(x=>splitAnswer(x.answer).forEach(v=>counts[v]=(counts[v]||0)+1));
-    const denominator=(s.answers||[]).length||1;
-    const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-    if(!entries.length) return '<div class="no-data">Sem respostas para esta pergunta.</div>';
-    return `<div class="chart-list">${entries.map(([name,n])=>{
-      const pct=Math.round(n/denominator*100);
-      return `<div class="result-row"><div class="result-label">${esc(name)}</div><div class="result-track"><div class="result-fill" style="width:${Math.min(100,pct)}%"></div></div><div class="result-value">${pct}% <span style="font-weight:650;color:#8391a1;font-size:.82rem">(${n})</span></div></div>`;
+    if(!s.answers.length){
+      return '<div class="no-data">Sem respostas para esta pergunta.</div>';
+    }
+
+    const counts = {};
+    s.answers.forEach(item => {
+      splitAnswer(item.answer).forEach(value => {
+        counts[value] = (counts[value] || 0) + 1;
+      });
+    });
+
+    const entries = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+    if(!entries.length){
+      return '<div class="no-data">Sem respostas para esta pergunta.</div>';
+    }
+
+    // Para múltipla seleção, o percentual é "percentual de participantes que
+    // selecionaram esta opção", portanto o denominador continua sendo o número
+    // de participantes que responderam a pergunta — e não a soma das escolhas.
+    const denominator = s.answers.length;
+
+    return `<div class="chart-list">${entries.map(([name,count]) => {
+      const pct = Math.round((count / denominator) * 100);
+      return `
+        <div class="result-row">
+          <div class="result-label">${esc(name)}</div>
+          <div class="result-track"><div class="result-fill" style="width:${Math.min(100,pct)}%"></div></div>
+          <div class="result-value">${pct}% <span style="font-weight:650;color:#8391a1;font-size:.82rem">(${count})</span></div>
+        </div>`;
     }).join('')}</div>`;
   }
 
   function renderOpen(s){
-    const answers=(s.answers||[]).map(x=>x.answer).filter(Boolean);
-    if(!answers.length) return '<div class="no-data">Sem respostas abertas para esta pergunta.</div>';
-    const max=9, shown=answers.slice(-max).reverse(), remaining=Math.max(0,answers.length-shown.length);
-    return `<div class="open-wall">${shown.map(a=>`<div class="open-card">${esc(a)}</div>`).join('')}${remaining?`<div class="open-more">+ ${remaining} outra${remaining===1?' resposta':'s respostas'} registrada${remaining===1?'':'s'}</div>`:''}</div>`;
+    const answers = s.answers
+      .map(x => String(x.answer || '').trim())
+      .filter(Boolean);
+
+    if(!answers.length){
+      return '<div class="no-data">Sem respostas abertas para esta pergunta.</div>';
+    }
+
+    // Em apresentação, muitas respostas simultâneas ficam ilegíveis.
+    // Mostra até 9 por slide, preservando a ordem recebida do backend.
+    const maxShown = 9;
+    const shown = answers.slice(0, maxShown);
+    const remaining = Math.max(0, answers.length - shown.length);
+
+    return `
+      <div class="open-wall">
+        ${shown.map(answer => `<div class="open-card">${esc(answer)}</div>`).join('')}
+        ${remaining ? `<div class="open-more">+ ${remaining} outra${remaining === 1 ? ' resposta' : 's respostas'} registrada${remaining === 1 ? '' : 's'}</div>` : ''}
+      </div>`;
   }
 
-  function prev(){ if(current>0){current--;render();} }
-  function next(){ if(current<slides.length-1){current++;render();} }
+  function prev(){
+    if(current > 0){ current--; render(); }
+  }
+
+  function next(){
+    if(current < slides.length - 1){ current++; render(); }
+  }
+
   function openOverview(){ $('overview').classList.remove('hidden'); }
   function closeOverview(){ $('overview').classList.add('hidden'); }
 
-  $('prevBtn').onclick=prev; $('nextBtn').onclick=next;
-  $('refreshBtn').onclick=loadAll;
-  $('overviewBtn').onclick=openOverview; $('closeOverviewBtn').onclick=closeOverview;
-  $('overview').onclick=e=>{if(e.target===$('overview'))closeOverview();};
-  $('slideSelect').onchange=e=>{current=Number(e.target.value);render();};
-  $('fullscreenBtn').onclick=async()=>{ try{ if(!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); }catch(_e){} };
-  document.addEventListener('keydown',e=>{
-    if(!$('overview').classList.contains('hidden')){ if(e.key==='Escape')closeOverview(); return; }
-    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') { e.preventDefault(); next(); }
-    if(e.key==='ArrowLeft'||e.key==='PageUp') { e.preventDefault(); prev(); }
-    if(e.key.toLowerCase()==='r') loadAll();
-    if(e.key.toLowerCase()==='f') $('fullscreenBtn').click();
+  $('prevBtn').onclick = prev;
+  $('nextBtn').onclick = next;
+  $('refreshBtn').onclick = loadAll;
+  $('overviewBtn').onclick = openOverview;
+  $('closeOverviewBtn').onclick = closeOverview;
+  $('overview').onclick = e => { if(e.target === $('overview')) closeOverview(); };
+  $('slideSelect').onchange = e => { current = Number(e.target.value); render(); };
+
+  $('fullscreenBtn').onclick = async () => {
+    try {
+      if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch(err){ console.error(err); }
+  };
+
+  document.addEventListener('keydown', e => {
+    // Não interfere com select/inputs caso o navegador esteja focado neles.
+    if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) return;
+
+    if(e.key === 'ArrowLeft' || e.key === 'PageUp'){
+      e.preventDefault(); prev();
+    } else if(e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){
+      e.preventDefault(); next();
+    } else if(e.key.toLowerCase() === 'r'){
+      e.preventDefault(); loadAll();
+    } else if(e.key.toLowerCase() === 'f'){
+      e.preventDefault(); $('fullscreenBtn').click();
+    } else if(e.key === 'Escape'){
+      closeOverview();
+    }
   });
 
-  const hashIndex=Number(location.hash.replace('#',''))-1;
-  if(Number.isFinite(hashIndex)&&hashIndex>=0) current=hashIndex;
   loadAll();
 })();
