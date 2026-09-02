@@ -220,6 +220,63 @@
     return await call({action:'state'});
   }
 
+  async function hasSubmitted(sessionId, roundNum){
+  if(!API){
+    return localStorage.getItem(`submitted_${sessionId}_${roundNum}`) === '1';
+  }
+
+  const data = await call({
+    action: 'hasSubmitted',
+    participantId,
+    sessionId,
+    round: roundNum
+  });
+
+  return !!data.submitted;
+}
+
+async function renderSubmittedState(sessionId, roundNum){
+  localStorage.setItem(`submitted_${sessionId}_${roundNum}`, '1');
+
+  renderProgress(roundNum);
+  content.className = 'card';
+
+  content.innerHTML = `
+    <div class="success">
+      <strong>Você já respondeu a esta rodada.</strong>
+      <p>Aguarde a discussão e a próxima etapa.</p>
+
+      <div class="actions" style="margin-top:16px">
+        <button id="recheckBtn" class="btn btn-secondary" type="button">
+          Verificar novamente
+        </button>
+      </div>
+    </div>`;
+
+  document.getElementById('recheckBtn').onclick = async () => {
+    const btn = document.getElementById('recheckBtn');
+
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+
+    try {
+      const stillSubmitted = await hasSubmitted(sessionId, roundNum);
+
+      if(!stillSubmitted){
+        localStorage.removeItem(`submitted_${sessionId}_${roundNum}`);
+        renderRound(roundNum);
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Resposta ainda registrada';
+      }
+    } catch(err){
+      btn.disabled = false;
+      btn.textContent = 'Verificar novamente';
+      alert('Não foi possível verificar a resposta.\n\n' + err.message);
+    }
+  };
+}
+
   async function tick(){
     try {
       const next = await fetchState();
@@ -230,13 +287,28 @@
         lastRenderedRound = renderedKey;
         if(next.status === 'finished' || Number(next.currentRound) === 6) renderFinished();
         else if(Number(next.currentRound) >= 1 && Number(next.currentRound) <= 5){
-          const submitted = localStorage.getItem(`submitted_${next.sessionId}_${next.currentRound}`) === '1';
-          if(submitted) {
-            renderProgress(Number(next.currentRound));
-            content.className='card';
-            content.innerHTML = `<div class="success"><strong>Você já respondeu a esta rodada.</strong><p>Aguarde a discussão e a próxima etapa.</p></div>`;
-          } else renderRound(Number(next.currentRound));
-        } else renderWaiting();
+  const roundNum = Number(next.currentRound);
+
+  const submitted = await hasSubmitted(
+    next.sessionId,
+    roundNum
+  );
+
+  if(submitted){
+    await renderSubmittedState(
+      next.sessionId,
+      roundNum
+    );
+  } else {
+    localStorage.removeItem(
+      `submitted_${next.sessionId}_${roundNum}`
+    );
+
+    renderRound(roundNum);
+  }
+} 
+        
+        else renderWaiting();
       }
     } catch(err){
       setStatus('sem conexão');
