@@ -20,7 +20,7 @@
           title:'Para cada ação, qual nível de autonomia você permitiria?',
           type:'matrix',
           rows:[
-            'Identificar o assunto',
+            'Identificar o assunto da solicitação',
             'Sugerir a unidade responsável',
             'Classificar a urgência',
             'Encaminhar automaticamente',
