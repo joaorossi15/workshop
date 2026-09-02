@@ -76,10 +76,18 @@
     });
   }
 
-  async function call(payload){
-    if(!API){ return demoCall(payload); }
-    return await bridgePost(payload);
-  }
+async function call(payload){
+  if(!API){ return demoCall(payload); }
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+  if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
+  const data = await res.json();
+  if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
+  return data;
+}
 
   function demoCall(payload){
     if(payload.action==='setRound'){ localStorage.setItem('workshop_demo_round',String(payload.round)); return Promise.resolve({ok:true}); }
@@ -135,17 +143,17 @@
     }
   }
 
-  async function fetchState(){
-    if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
-    return await bridgeGet({action:'state'});
+async function fetchState(){
+  if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
+  return await call({action:'state'});
+}
+async function fetchResults(){
+  if(!API){
+    const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
+    return aggregateDemo(arr,state.currentRound);
   }
-  async function fetchResults(){
-    if(!API){
-      const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
-      return aggregateDemo(arr,state.currentRound);
-    }
-    return await bridgeGet({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
-  }
+  return await call({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
+}
 
   function aggregateDemo(arr,round){
     const latest={};
