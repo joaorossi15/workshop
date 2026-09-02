@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#145f8c" />
+  <title>Agente em produção?</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">IA</div>
+        <div class="brand-copy"><strong id="brandTitle">Agente em produção?</strong><span id="brandOrg">Oficina — Guia de Agentes de IA</span></div>
+      </div>
+      <div class="status-pill" id="connectionStatus">conectando...</div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Experiência interativa</div>
+        <h1>Você colocaria este agente em produção?</h1>
+        <p class="lead">A turma inteira analisará o mesmo caso. Em cada rodada, você toma decisões; em seguida, os resultados são discutidos coletivamente antes da próxima etapa.</p>
+      </div>
+      <div class="hero-card case-mini">
+        <div class="label">Caso da oficina</div>
+        <strong>Atendimento e encaminhamento ao cidadão</strong>
+        <p>Um agente poderá ler solicitações, identificar o assunto, classificar urgência, encaminhar demandas e preparar respostas.</p>
+      </div>
+    </section>
+
+    <section class="card progress-card">
+      <div class="progress-row" id="progressBar"></div>
+      <div class="progress-labels"><span>adequação</span><span>autonomia</span><span>riscos</span><span>controles</span><span>decisão</span></div>
+    </section>
+
+    <div id="configWarning" class="notice hidden"><strong>Modo de demonstração.</strong> O endereço do Google Apps Script ainda não foi configurado em <code class="inline">config.js</code>. As respostas ficarão somente neste navegador.</div>
+
+    <section id="content" class="card waiting">
+      <div class="wait-icon">◷</div>
+      <h2>Aguardando o facilitador</h2>
+      <p class="lead" style="margin-inline:auto">A próxima rodada aparecerá aqui automaticamente quando for liberada.</p>
+    </section>
+  </main>
+
+  <footer class="footer shell">Atividade baseada no Guia de Agentes de IA para Serviços Públicos Digitais.</footer>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

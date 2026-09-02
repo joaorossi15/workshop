@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#145f8c" />
+  <title>Painel do facilitador</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar"><div class="shell topbar-inner"><div class="brand"><div class="brand-mark">IA</div><div class="brand-copy"><strong>Painel do facilitador</strong><span>Controle das rodadas e resultados ao vivo</span></div></div><div class="status-pill" id="connectionStatus">conectando...</div></div></header>
+  <main class="shell">
+    <section class="hero" style="grid-template-columns:1fr .55fr">
+      <div class="hero-card"><div class="eyebrow">Controle da oficina</div><h1 style="font-size:clamp(2rem,4vw,3rem)">Conduza a experiência em tempo real</h1><p class="lead">Abra uma rodada, aguarde as respostas, projete os resultados e discuta com a turma antes de avançar.</p></div>
+      <div class="hero-card case-mini"><div class="label">sessão atual</div><strong id="sessionCode">—</strong><p id="sessionInfo">Carregando estado...</p></div>
+    </section>
+
+    <div id="configWarning" class="notice hidden"><strong>Modo de demonstração.</strong> Configure o endpoint em <code class="inline">config.js</code> antes da oficina real.</div>
+
+    <section class="fac-grid">
+      <aside class="card control-panel">
+        <h3>Controle das rodadas</h3><p class="small">A mudança aparece nos dispositivos dos participantes em poucos segundos.</p>
+        <div class="control-list" id="roundControls"></div>
+        <hr style="border:0;border-top:1px solid var(--border);margin:18px 0">
+        <label class="small" for="adminKey">Chave do facilitador</label>
+        <input id="adminKey" type="password" placeholder="Digite a chave configurada no Apps Script" style="margin:6px 0 10px">
+        <div class="admin-row"><button class="btn btn-secondary" id="refreshBtn" style="flex:1">Atualizar</button><button class="btn btn-danger" id="resetBtn" style="flex:1">Nova sessão</button></div>
+      </aside>
+
+      <section>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:start"><div><div class="eyebrow">Resultados ao vivo</div><h2 id="resultTitle">Aguardando rodada</h2></div><div class="status-pill live" id="responsesBadge">0 participantes</div></div>
+          <div class="metric-grid" id="metrics"></div>
+          <div id="results"><p class="lead">Abra uma rodada para começar.</p></div>
+        </div>
+      </section>
+    </section>
+  </main>
+  <footer class="footer shell">Dica: projete apenas este painel; os participantes usam <code class="inline">index.html</code>.</footer>
+  <script src="config.js"></script>
+  <script src="facilitator.js"></script>
+</body>
+</html>
