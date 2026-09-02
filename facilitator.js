@@ -33,81 +33,77 @@
     }
   }
 
-  function jsonp(params){
+  // Comunicação sem CORS/JSONP: carrega uma pequena página HTML do
+  // Apps Script em um iframe invisível. Ela devolve o resultado com postMessage.
+  function bridgeGet(params){
     return new Promise((resolve,reject)=>{
-      const cb='__fac_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const script=document.createElement('script');
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o servidor.')),10000);
-      function cleanup(err,data){
-        clearTimeout(timer); delete window[cb]; script.remove();
-        if(err) reject(err); else resolve(data);
+      const requestId='fac_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const iframe=document.createElement('iframe');
+      iframe.style.display='none';
+      iframe.setAttribute('aria-hidden','true');
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o Apps Script.')),12000);
+
+      function onMessage(ev){
+        const msg=ev.data;
+        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
+        cleanup(null,msg.data);
       }
-      window[cb]=(data)=>{
-        if(!data || data.ok===false) cleanup(new Error((data&&data.error)||'Erro no servidor'));
-        else cleanup(null,data);
-      };
-      const q=new URLSearchParams({...params,callback:cb,t:String(Date.now())});
-      script.src=API+'?'+q.toString();
-      script.onerror=()=>cleanup(new Error('Não foi possível acessar o Apps Script.'));
-      document.head.appendChild(script);
+      function cleanup(err,data){
+        clearTimeout(timer);
+        window.removeEventListener('message',onMessage);
+        iframe.remove();
+        if(err) reject(err);
+        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
+        else resolve(data);
+      }
+      window.addEventListener('message',onMessage);
+      const q=new URLSearchParams({...params,bridge:'1',requestId,t:String(Date.now())});
+      iframe.src=API+'?'+q.toString();
+      iframe.onerror=()=>cleanup(new Error('Não foi possível abrir a ponte com o Apps Script.'));
+      document.body.appendChild(iframe);
     });
   }
 
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-  // Envia POST cross-origin sem usar fetch/CORS. Apps Script pode redirecionar
-  // respostas de Web Apps, e alguns navegadores (especialmente Firefox)
-  // transformam isso em NetworkError mesmo com mode=no-cors. Um formulário
-  // HTML normal pode fazer POST cross-origin sem depender de CORS.
-  function postOneWay(payload){
+  // POST via formulário para iframe invisível + confirmação por postMessage.
+  function bridgePost(payload){
     return new Promise((resolve,reject)=>{
-      const frameName='__fac_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const requestId='facpost_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const frameName='frame_'+requestId;
       const iframe=document.createElement('iframe');
       iframe.name=frameName;
       iframe.style.display='none';
       iframe.setAttribute('aria-hidden','true');
 
       const form=document.createElement('form');
-      form.method='POST';
-      form.action=API;
-      form.target=frameName;
-      form.style.display='none';
+      form.method='POST'; form.action=API; form.target=frameName; form.style.display='none';
+      const fields={payload:JSON.stringify(payload),bridge:'1',requestId};
+      Object.entries(fields).forEach(([name,value])=>{
+        const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input);
+      });
 
-      const input=document.createElement('input');
-      input.type='hidden';
-      input.name='payload';
-      input.value=JSON.stringify(payload);
-      form.appendChild(input);
-
-      document.body.appendChild(iframe);
-      document.body.appendChild(form);
-
-      try {
-        form.submit();
-        form.remove();
-        // Mantemos o iframe por alguns segundos para não abortar o POST
-        // enquanto o Apps Script segue seus redirecionamentos internos.
-        setTimeout(()=>iframe.remove(),15000);
-        setTimeout(resolve,80);
-      } catch(err){
-        form.remove();
-        iframe.remove();
-        reject(err);
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao enviar comando ao Apps Script.')),15000);
+      function onMessage(ev){
+        const msg=ev.data;
+        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
+        cleanup(null,msg.data);
       }
+      function cleanup(err,data){
+        clearTimeout(timer); window.removeEventListener('message',onMessage); form.remove(); iframe.remove();
+        if(err) reject(err);
+        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
+        else resolve(data);
+      }
+      window.addEventListener('message',onMessage);
+      document.body.appendChild(iframe); document.body.appendChild(form);
+      try{ form.submit(); }catch(err){ cleanup(err); }
     });
   }
 
   async function call(payload){
     if(!API){ return demoCall(payload); }
-    const before=await jsonp({action:'state'});
-    await postOneWay(payload);
-    for(let i=0;i<6;i++){
-      await sleep(400+i*250);
-      const after=await jsonp({action:'state'});
-      if(payload.action==='setRound' && Number(after.currentRound)===Number(payload.round)) return after;
-      if(payload.action==='resetSession' && after.sessionId && after.sessionId!==before.sessionId) return after;
-    }
-    throw new Error('A alteração não foi confirmada. Confira a chave do facilitador e a implantação do Apps Script.');
+    return await bridgePost(payload);
   }
 
   function demoCall(payload){
@@ -166,14 +162,14 @@
 
   async function fetchState(){
     if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
-    return await jsonp({action:'state'});
+    return await bridgeGet({action:'state'});
   }
   async function fetchResults(){
     if(!API){
       const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
       return aggregateDemo(arr,state.currentRound);
     }
-    return await jsonp({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
+    return await bridgeGet({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
   }
 
   function aggregateDemo(arr,round){

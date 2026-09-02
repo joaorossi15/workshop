@@ -185,78 +185,62 @@
     }
   }
 
-  function jsonp(params){
+  // Comunicação com Apps Script sem CORS/JSONP.
+  function bridgeGet(params){
     return new Promise((resolve,reject)=>{
-      const cb='__workshop_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const script=document.createElement('script');
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o servidor.')),10000);
-      function cleanup(err,data){
-        clearTimeout(timer);
-        delete window[cb];
-        script.remove();
-        if(err) reject(err); else resolve(data);
+      const requestId='usr_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const iframe=document.createElement('iframe');
+      iframe.style.display='none'; iframe.setAttribute('aria-hidden','true');
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o Apps Script.')),12000);
+      function onMessage(ev){
+        const msg=ev.data;
+        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
+        cleanup(null,msg.data);
       }
-      window[cb]=(data)=>{
-        if(!data || data.ok===false) cleanup(new Error((data&&data.error)||'Erro no servidor'));
-        else cleanup(null,data);
-      };
-      const q=new URLSearchParams({...params,callback:cb,t:String(Date.now())});
-      script.src=API+'?'+q.toString();
-      script.onerror=()=>cleanup(new Error('Não foi possível acessar o Apps Script.'));
-      document.head.appendChild(script);
+      function cleanup(err,data){
+        clearTimeout(timer); window.removeEventListener('message',onMessage); iframe.remove();
+        if(err) reject(err);
+        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
+        else resolve(data);
+      }
+      window.addEventListener('message',onMessage);
+      const q=new URLSearchParams({...params,bridge:'1',requestId,t:String(Date.now())});
+      iframe.src=API+'?'+q.toString();
+      iframe.onerror=()=>cleanup(new Error('Não foi possível abrir a ponte com o Apps Script.'));
+      document.body.appendChild(iframe);
     });
   }
 
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-
-  function postOneWay(payload){
+  function bridgePost(payload){
     return new Promise((resolve,reject)=>{
-      const frameName='__workshop_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const requestId='usrpost_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const frameName='frame_'+requestId;
       const iframe=document.createElement('iframe');
-      iframe.name=frameName;
-      iframe.style.display='none';
-      iframe.setAttribute('aria-hidden','true');
-
+      iframe.name=frameName; iframe.style.display='none'; iframe.setAttribute('aria-hidden','true');
       const form=document.createElement('form');
-      form.method='POST';
-      form.action=API;
-      form.target=frameName;
-      form.style.display='none';
-
-      const input=document.createElement('input');
-      input.type='hidden';
-      input.name='payload';
-      input.value=JSON.stringify(payload);
-      form.appendChild(input);
-
-      document.body.appendChild(iframe);
-      document.body.appendChild(form);
-
-      try {
-        form.submit();
-        form.remove();
-        setTimeout(()=>iframe.remove(),15000);
-        setTimeout(resolve,80);
-      } catch(err){
-        form.remove();
-        iframe.remove();
-        reject(err);
+      form.method='POST'; form.action=API; form.target=frameName; form.style.display='none';
+      const fields={payload:JSON.stringify(payload),bridge:'1',requestId};
+      Object.entries(fields).forEach(([name,value])=>{ const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input); });
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao enviar ao Apps Script.')),15000);
+      function onMessage(ev){
+        const msg=ev.data;
+        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
+        cleanup(null,msg.data);
       }
+      function cleanup(err,data){
+        clearTimeout(timer); window.removeEventListener('message',onMessage); form.remove(); iframe.remove();
+        if(err) reject(err);
+        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
+        else resolve(data);
+      }
+      window.addEventListener('message',onMessage);
+      document.body.appendChild(iframe); document.body.appendChild(form);
+      try{ form.submit(); }catch(err){ cleanup(err); }
     });
   }
 
   async function postPayload(payload){
-    // POST via formulário invisível: funciona cross-origin sem depender de CORS
-    // e evita NetworkError causado pelos redirecionamentos do Apps Script.
-    await postOneWay(payload);
-    for(let i=0;i<7;i++){
-      await sleep(450+i*300);
-      try{
-        const st=await jsonp({action:'submissionStatus',sessionId:payload.sessionId,round:String(payload.round),participantId:payload.participantId});
-        if(st.submitted) return {ok:true};
-      }catch(_e){}
-    }
-    throw new Error('O envio não pôde ser confirmado. Verifique a conexão e tente novamente.');
+    return await bridgePost(payload);
   }
 
   function saveDemo(payload){
@@ -273,7 +257,7 @@
       const demoRound = Number(localStorage.getItem('workshop_demo_round') || '1');
       return {ok:true, currentRound:demoRound, sessionId:'demo', status: demoRound===6?'finished':'live'};
     }
-    return await jsonp({action:'state'});
+    return await bridgeGet({action:'state'});
   }
 
   async function tick(){
