@@ -226,7 +226,7 @@
   }
 
   const data = await call({
-    action: 'hasSubmitted',
+    action: 'submissionStatus',
     participantId,
     sessionId,
     round: roundNum
