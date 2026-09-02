@@ -174,7 +174,7 @@
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true; btn.textContent = 'Enviando...';
     const payload = {action:'submit', participantId, sessionId:state.sessionId, round:roundNum, answers};
     try {
-      if(API) await postPayload(payload);
+      if(API) await call(payload);
       else saveDemo(payload);
       localStorage.setItem(`submitted_${state.sessionId}_${roundNum}`, '1');
       content.innerHTML = `<div class="success"><strong>Resposta registrada.</strong><p>Agora acompanhe a discussão coletiva. Quando o facilitador liberar a próxima rodada, ela aparecerá automaticamente aqui.</p></div>`;
@@ -185,44 +185,24 @@
     }
   }
 
-  // Comunicação com Apps Script sem CORS/JSONP.
-  // v5: leituras também usam POST de formulário invisível.
-  // Evita GET /exec em iframe, que pode ser redirecionado para ServiceLogin
-  // em contexto de terceiros mesmo quando o Web App é público.
-  function bridgeGet(params){
-    return bridgePost({...params});
-  }
-
-  function bridgePost(payload){
-    return new Promise((resolve,reject)=>{
-      const requestId='usrpost_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const frameName='frame_'+requestId;
-      const iframe=document.createElement('iframe');
-      iframe.name=frameName; iframe.style.display='none'; iframe.setAttribute('aria-hidden','true');
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API; form.target=frameName; form.style.display='none';
-      const fields={payload:JSON.stringify(payload),bridge:'1',requestId};
-      Object.entries(fields).forEach(([name,value])=>{ const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input); });
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao enviar ao Apps Script.')),15000);
-      function onMessage(ev){
-        const msg=ev.data;
-        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
-        cleanup(null,msg.data);
-      }
-      function cleanup(err,data){
-        clearTimeout(timer); window.removeEventListener('message',onMessage); form.remove(); iframe.remove();
-        if(err) reject(err);
-        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
-        else resolve(data);
-      }
-      window.addEventListener('message',onMessage);
-      document.body.appendChild(iframe); document.body.appendChild(form);
-      try{ form.submit(); }catch(err){ cleanup(err); }
-    });
-  }
-
-  async function postPayload(payload){
-    return await bridgePost(payload);
+  // Comunicação direta com o Apps Script via fetch(). O corpo vai como
+  // text/plain (em vez de application/json) para evitar que o navegador
+  // dispare um preflight OPTIONS, que o Apps Script não trata.
+  async function call(payload){
+    let res;
+    try {
+      res = await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      throw new Error('Falha de rede ao contatar o Apps Script: ' + err.message);
+    }
+    if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
+    const data = await res.json();
+    if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
+    return data;
   }
 
   function saveDemo(payload){
@@ -239,7 +219,7 @@
       const demoRound = Number(localStorage.getItem('workshop_demo_round') || '1');
       return {ok:true, currentRound:demoRound, sessionId:'demo', status: demoRound===6?'finished':'live'};
     }
-    return await bridgeGet({action:'state'});
+    return await call({action:'state'});
   }
 
   async function tick(){
