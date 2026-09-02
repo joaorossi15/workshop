@@ -33,11 +33,81 @@
     }
   }
 
+  function jsonp(params){
+    return new Promise((resolve,reject)=>{
+      const cb='__fac_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const script=document.createElement('script');
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o servidor.')),10000);
+      function cleanup(err,data){
+        clearTimeout(timer); delete window[cb]; script.remove();
+        if(err) reject(err); else resolve(data);
+      }
+      window[cb]=(data)=>{
+        if(!data || data.ok===false) cleanup(new Error((data&&data.error)||'Erro no servidor'));
+        else cleanup(null,data);
+      };
+      const q=new URLSearchParams({...params,callback:cb,t:String(Date.now())});
+      script.src=API+'?'+q.toString();
+      script.onerror=()=>cleanup(new Error('Não foi possível acessar o Apps Script.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+  // Envia POST cross-origin sem usar fetch/CORS. Apps Script pode redirecionar
+  // respostas de Web Apps, e alguns navegadores (especialmente Firefox)
+  // transformam isso em NetworkError mesmo com mode=no-cors. Um formulário
+  // HTML normal pode fazer POST cross-origin sem depender de CORS.
+  function postOneWay(payload){
+    return new Promise((resolve,reject)=>{
+      const frameName='__fac_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const iframe=document.createElement('iframe');
+      iframe.name=frameName;
+      iframe.style.display='none';
+      iframe.setAttribute('aria-hidden','true');
+
+      const form=document.createElement('form');
+      form.method='POST';
+      form.action=API;
+      form.target=frameName;
+      form.style.display='none';
+
+      const input=document.createElement('input');
+      input.type='hidden';
+      input.name='payload';
+      input.value=JSON.stringify(payload);
+      form.appendChild(input);
+
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+
+      try {
+        form.submit();
+        form.remove();
+        // Mantemos o iframe por alguns segundos para não abortar o POST
+        // enquanto o Apps Script segue seus redirecionamentos internos.
+        setTimeout(()=>iframe.remove(),15000);
+        setTimeout(resolve,80);
+      } catch(err){
+        form.remove();
+        iframe.remove();
+        reject(err);
+      }
+    });
+  }
+
   async function call(payload){
     if(!API){ return demoCall(payload); }
-    const body = new URLSearchParams({payload:JSON.stringify(payload)});
-    const res=await fetch(API,{method:'POST',body});
-    const data=await res.json(); if(!data.ok) throw new Error(data.error||'Erro'); return data;
+    const before=await jsonp({action:'state'});
+    await postOneWay(payload);
+    for(let i=0;i<6;i++){
+      await sleep(400+i*250);
+      const after=await jsonp({action:'state'});
+      if(payload.action==='setRound' && Number(after.currentRound)===Number(payload.round)) return after;
+      if(payload.action==='resetSession' && after.sessionId && after.sessionId!==before.sessionId) return after;
+    }
+    throw new Error('A alteração não foi confirmada. Confira a chave do facilitador e a implantação do Apps Script.');
   }
 
   function demoCall(payload){
@@ -46,29 +116,64 @@
     return Promise.resolve({ok:true});
   }
 
+  let mutationInFlight=false;
+
+  function setMutationBusy(busy,label='processando...'){
+    mutationInFlight=busy;
+    document.querySelectorAll('#roundControls button, #resetBtn').forEach(b=>b.disabled=busy);
+    const resetBtn=document.getElementById('resetBtn');
+    if(resetBtn){
+      if(!resetBtn.dataset.originalText) resetBtn.dataset.originalText=resetBtn.textContent;
+      resetBtn.textContent=busy?label:resetBtn.dataset.originalText;
+    }
+  }
+
   async function setRound(round){
+    if(mutationInFlight) return;
     if(API && !adminKey()){ alert('Digite a chave do facilitador.'); return; }
-    try { await call({action:'setRound',round,adminKey:adminKey()}); await refresh(); }
-    catch(e){ alert(e.message); }
+    setMutationBusy(true,'Atualizando...');
+    try {
+      setStatus('atualizando...');
+      await call({action:'setRound',round,adminKey:adminKey()});
+      await refresh();
+    } catch(e){
+      setStatus('erro ao atualizar');
+      alert(e.message);
+      // Tenta recuperar o painel mesmo após uma falha de rede.
+      try { await refresh(); } catch(_err){}
+    } finally {
+      setMutationBusy(false);
+    }
   }
 
   async function reset(){
+    if(mutationInFlight) return;
     if(!confirm('Iniciar uma nova sessão? Os dados anteriores permanecerão na planilha, mas deixarão de aparecer neste painel.')) return;
     if(API && !adminKey()){ alert('Digite a chave do facilitador.'); return; }
-    try { await call({action:'resetSession',adminKey:adminKey()}); await refresh(); }
-    catch(e){ alert(e.message); }
+    setMutationBusy(true,'Criando sessão...');
+    try {
+      setStatus('criando sessão...');
+      await call({action:'resetSession',adminKey:adminKey()});
+      await refresh();
+    } catch(e){
+      setStatus('erro ao criar sessão');
+      alert(e.message);
+      try { await refresh(); } catch(_err){}
+    } finally {
+      setMutationBusy(false);
+    }
   }
 
   async function fetchState(){
     if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
-    return await (await fetch(API+'?action=state&t='+Date.now(),{cache:'no-store'})).json();
+    return await jsonp({action:'state'});
   }
   async function fetchResults(){
     if(!API){
       const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
       return aggregateDemo(arr,state.currentRound);
     }
-    return await (await fetch(API+`?action=results&sessionId=${encodeURIComponent(state.sessionId)}&round=${state.currentRound}&t=${Date.now()}`,{cache:'no-store'})).json();
+    return await jsonp({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
   }
 
   function aggregateDemo(arr,round){

@@ -40,11 +40,19 @@ function doGet(e) {
   try {
     setup_();
     const action = (e.parameter.action || 'state').trim();
-    if (action === 'state') return json_(getState_());
-    if (action === 'results') return json_(getResults_(e.parameter.sessionId, Number(e.parameter.round || 0)));
-    return json_({ok:false,error:'Ação GET desconhecida.'});
+    let result;
+    if (action === 'state') {
+      result = getState_();
+    } else if (action === 'results') {
+      result = getResults_(e.parameter.sessionId, Number(e.parameter.round || 0));
+    } else if (action === 'submissionStatus') {
+      result = getSubmissionStatus_(e.parameter.sessionId, Number(e.parameter.round || 0), e.parameter.participantId || '');
+    } else {
+      result = {ok:false,error:'Ação GET desconhecida.'};
+    }
+    return response_(result, e.parameter.callback || '');
   } catch (err) {
-    return json_({ok:false,error:String(err && err.message || err)});
+    return response_({ok:false,error:String(err && err.message || err)}, (e && e.parameter && e.parameter.callback) || '');
   }
 }
 
@@ -63,6 +71,19 @@ function doPost(e) {
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Para leituras feitas a partir do GitHub Pages, aceita JSONP via ?callback=...
+// Isso evita depender de CORS do Apps Script em navegadores móveis.
+function response_(obj, callback) {
+  const json = JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+  const cb = String(callback || '');
+  if (cb && /^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(cb)) {
+    return ContentService
+      .createTextOutput(cb + '(' + json + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return json_(obj);
 }
 
 function getConfigMap_() {
@@ -102,6 +123,22 @@ function submit_(p) {
     if (rows.length) rs.getRange(rs.getLastRow()+1,1,rows.length,8).setValues(rows);
   } finally { lock.releaseLock(); }
   return {ok:true};
+}
+
+function getSubmissionStatus_(sessionId, round, participantId) {
+  const c = getConfigMap_();
+  if (!sessionId || sessionId !== c.session_id) return {ok:true,submitted:false,reason:'session'};
+  if (!participantId || !round) return {ok:true,submitted:false};
+  const rs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(RESPONSES_SHEET);
+  const values = rs.getDataRange().getValues();
+  for (let i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][1]) === String(sessionId) &&
+        String(values[i][2]) === String(participantId) &&
+        Number(values[i][3]) === Number(round)) {
+      return {ok:true,submitted:true};
+    }
+  }
+  return {ok:true,submitted:false};
 }
 
 function assertAdmin_(p) {

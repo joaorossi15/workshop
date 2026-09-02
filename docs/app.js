@@ -185,13 +185,78 @@
     }
   }
 
+  function jsonp(params){
+    return new Promise((resolve,reject)=>{
+      const cb='__workshop_cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const script=document.createElement('script');
+      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o servidor.')),10000);
+      function cleanup(err,data){
+        clearTimeout(timer);
+        delete window[cb];
+        script.remove();
+        if(err) reject(err); else resolve(data);
+      }
+      window[cb]=(data)=>{
+        if(!data || data.ok===false) cleanup(new Error((data&&data.error)||'Erro no servidor'));
+        else cleanup(null,data);
+      };
+      const q=new URLSearchParams({...params,callback:cb,t:String(Date.now())});
+      script.src=API+'?'+q.toString();
+      script.onerror=()=>cleanup(new Error('Não foi possível acessar o Apps Script.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+  function postOneWay(payload){
+    return new Promise((resolve,reject)=>{
+      const frameName='__workshop_post_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const iframe=document.createElement('iframe');
+      iframe.name=frameName;
+      iframe.style.display='none';
+      iframe.setAttribute('aria-hidden','true');
+
+      const form=document.createElement('form');
+      form.method='POST';
+      form.action=API;
+      form.target=frameName;
+      form.style.display='none';
+
+      const input=document.createElement('input');
+      input.type='hidden';
+      input.name='payload';
+      input.value=JSON.stringify(payload);
+      form.appendChild(input);
+
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+
+      try {
+        form.submit();
+        form.remove();
+        setTimeout(()=>iframe.remove(),15000);
+        setTimeout(resolve,80);
+      } catch(err){
+        form.remove();
+        iframe.remove();
+        reject(err);
+      }
+    });
+  }
+
   async function postPayload(payload){
-    const body = new URLSearchParams({payload:JSON.stringify(payload)});
-    const res = await fetch(API, {method:'POST', body});
-    if(!res.ok) throw new Error('Falha HTTP ' + res.status);
-    const data = await res.json();
-    if(!data.ok) throw new Error(data.error || 'Erro no servidor');
-    return data;
+    // POST via formulário invisível: funciona cross-origin sem depender de CORS
+    // e evita NetworkError causado pelos redirecionamentos do Apps Script.
+    await postOneWay(payload);
+    for(let i=0;i<7;i++){
+      await sleep(450+i*300);
+      try{
+        const st=await jsonp({action:'submissionStatus',sessionId:payload.sessionId,round:String(payload.round),participantId:payload.participantId});
+        if(st.submitted) return {ok:true};
+      }catch(_e){}
+    }
+    throw new Error('O envio não pôde ser confirmado. Verifique a conexão e tente novamente.');
   }
 
   function saveDemo(payload){
@@ -208,10 +273,7 @@
       const demoRound = Number(localStorage.getItem('workshop_demo_round') || '1');
       return {ok:true, currentRound:demoRound, sessionId:'demo', status: demoRound===6?'finished':'live'};
     }
-    const url = API + '?action=state&t=' + Date.now();
-    const res = await fetch(url, {cache:'no-store'});
-    if(!res.ok) throw new Error('state HTTP ' + res.status);
-    return await res.json();
+    return await jsonp({action:'state'});
   }
 
   async function tick(){
