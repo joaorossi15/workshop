@@ -2,17 +2,11 @@
   const CFG = window.WORKSHOP_CONFIG || {};
   const API = (CFG.APPS_SCRIPT_URL || '').trim();
 
-  // ---------------------------------------------------------------------------
-  // Metadados ESPELHADOS do app.js real.
-  // IMPORTANTE: quando uma pergunta mudar no app.js, altere aqui também.
-  // ---------------------------------------------------------------------------
   const rounds = {
     1: {
       title: 'Faz sentido usar um agente aqui?',
       theme: 'Adequação e benefício',
       questions: [
-        {id:'r1_problem', title:'Qual é o problema principal que esse projeto tenta resolver?', type:'single'},
-        {id:'r1_benefit', title:'Qual seria o principal benefício esperado?', type:'single'},
         {id:'r1_needed', title:'Um agente de IA é realmente necessário?', type:'single'},
         {id:'r1_initial', title:'Com o que você sabe agora, qual é sua recomendação?', type:'single'}
       ]
@@ -126,9 +120,6 @@
       .filter(Boolean);
   }
 
-  // ---------------------------------------------------------------------------
-  // MESMA comunicação usada pelo app.js que já está funcionando.
-  // ---------------------------------------------------------------------------
   async function call(payload){
     if(!API) return demoCall(payload);
 
