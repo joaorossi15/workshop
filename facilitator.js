@@ -159,6 +159,8 @@
     }catch(e){ setStatus('sem conexão'); console.error(e); }
   }
 
-  document.getElementById('refreshBtn').onclick=refresh; document.getElementById('resetBtn').onclick=reset;
-  refresh(); setInterval(refresh,4000);
+  document.getElementById('refreshBtn').onclick = refresh;
+document.getElementById('resetBtn').onclick = reset;
+
+refresh();
 })();
