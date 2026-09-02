@@ -33,61 +33,26 @@
     }
   }
 
-  // Comunicação sem CORS/JSONP: carrega uma pequena página HTML do
-  // Apps Script em um iframe invisível. Ela devolve o resultado com postMessage.
-  // v5: leituras também usam POST de formulário invisível.
-  // Evita GET /exec em iframe, que pode ser redirecionado para ServiceLogin
-  // em contexto de terceiros mesmo quando o Web App é público.
-  function bridgeGet(params){
-    return bridgePost({...params});
-  }
-
-  function bridgePost(payload){
-    return new Promise((resolve,reject)=>{
-      const requestId='facpost_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const frameName='frame_'+requestId;
-      const iframe=document.createElement('iframe');
-      iframe.name=frameName;
-      iframe.style.display='none';
-      iframe.setAttribute('aria-hidden','true');
-
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API; form.target=frameName; form.style.display='none';
-      const fields={payload:JSON.stringify(payload),bridge:'1',requestId};
-      Object.entries(fields).forEach(([name,value])=>{
-        const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input);
+  // Comunicação direta com o Apps Script via fetch(). O corpo vai como
+  // text/plain (em vez de application/json) para evitar que o navegador
+  // dispare um preflight OPTIONS, que o Apps Script não trata.
+  async function call(payload){
+    if(!API){ return demoCall(payload); }
+    let res;
+    try {
+      res = await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload)
       });
-
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao enviar comando ao Apps Script.')),15000);
-      function onMessage(ev){
-        const msg=ev.data;
-        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
-        cleanup(null,msg.data);
-      }
-      function cleanup(err,data){
-        clearTimeout(timer); window.removeEventListener('message',onMessage); form.remove(); iframe.remove();
-        if(err) reject(err);
-        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
-        else resolve(data);
-      }
-      window.addEventListener('message',onMessage);
-      document.body.appendChild(iframe); document.body.appendChild(form);
-      try{ form.submit(); }catch(err){ cleanup(err); }
-    });
+    } catch (err) {
+      throw new Error('Falha de rede ao contatar o Apps Script: ' + err.message);
+    }
+    if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
+    const data = await res.json();
+    if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
+    return data;
   }
-
-async function call(payload){
-  if(!API){ return demoCall(payload); }
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify(payload)
-  });
-  if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
-  const data = await res.json();
-  if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
-  return data;
-}
 
   function demoCall(payload){
     if(payload.action==='setRound'){ localStorage.setItem('workshop_demo_round',String(payload.round)); return Promise.resolve({ok:true}); }
@@ -143,17 +108,17 @@ async function call(payload){
     }
   }
 
-async function fetchState(){
-  if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
-  return await call({action:'state'});
-}
-async function fetchResults(){
-  if(!API){
-    const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
-    return aggregateDemo(arr,state.currentRound);
+  async function fetchState(){
+    if(!API){ warning.classList.remove('hidden'); return {ok:true,currentRound:Number(localStorage.getItem('workshop_demo_round')||'0'),sessionId:'demo',status:'live'}; }
+    return await call({action:'state'});
   }
-  return await call({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
-}
+  async function fetchResults(){
+    if(!API){
+      const arr=JSON.parse(localStorage.getItem('workshop_demo_responses')||'[]');
+      return aggregateDemo(arr,state.currentRound);
+    }
+    return await call({action:'results',sessionId:state.sessionId,round:String(state.currentRound)});
+  }
 
   function aggregateDemo(arr,round){
     const latest={};
