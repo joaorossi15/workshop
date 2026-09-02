@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resultados — Oficina de Agentes de IA</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="results.css">
+</head>
+<body class="presentation-body">
+  <header class="presentation-topbar">
+    <div class="presentation-brand">
+      <div class="presentation-eyebrow">DISCUSSÃO DOS RESULTADOS</div>
+      <div id="workshopTitle" class="presentation-brand-title">Agente em produção?</div>
+    </div>
+    <div class="presentation-top-actions">
+      <span id="connectionStatus" class="status-pill">carregando...</span>
+      <button id="refreshBtn" class="present-btn present-btn-secondary" type="button">↻ Atualizar dados</button>
+      <button id="fullscreenBtn" class="present-btn present-btn-secondary" type="button">⛶ Tela cheia</button>
+    </div>
+  </header>
+
+  <main class="presentation-stage">
+    <section id="loadingState" class="presentation-empty">
+      <div class="presentation-spinner"></div>
+      <h1>Carregando resultados...</h1>
+      <p>Buscando as respostas da sessão atual.</p>
+    </section>
+
+    <section id="emptyState" class="presentation-empty hidden">
+      <div class="presentation-empty-icon">◌</div>
+      <h1>Ainda não há resultados</h1>
+      <p>Quando houver respostas, clique em <strong>Atualizar dados</strong>.</p>
+    </section>
+
+    <section id="slide" class="presentation-slide hidden" aria-live="polite">
+      <div class="slide-meta-row">
+        <div>
+          <span id="roundBadge" class="round-badge">Rodada 1</span>
+          <span id="roundTheme" class="round-theme-label"></span>
+        </div>
+        <div class="slide-counter"><span id="slideIndex">1</span> / <span id="slideTotal">1</span></div>
+      </div>
+
+      <div class="slide-heading">
+        <h1 id="questionTitle"></h1>
+        <div id="participantCount" class="participant-count"></div>
+      </div>
+
+      <div id="visualization" class="visualization"></div>
+
+      <div class="slide-footer">
+        <span id="sessionCode" class="session-label"></span>
+        <span class="keyboard-hint">← anterior &nbsp;&nbsp; próxima →</span>
+      </div>
+    </section>
+  </main>
+
+  <nav class="presentation-nav" aria-label="Navegação de resultados">
+    <button id="prevBtn" class="nav-arrow" type="button">← <span>Anterior</span></button>
+    <div class="nav-center">
+      <button id="overviewBtn" class="present-btn present-btn-secondary" type="button">☷ Visão geral</button>
+      <select id="slideSelect" class="slide-select" aria-label="Ir para pergunta"></select>
+    </div>
+    <button id="nextBtn" class="nav-arrow" type="button"><span>Próxima</span> →</button>
+  </nav>
+
+  <div id="overview" class="overview-overlay hidden" role="dialog" aria-modal="true" aria-label="Visão geral dos resultados">
+    <div class="overview-panel">
+      <div class="overview-head">
+        <div>
+          <div class="presentation-eyebrow">VISÃO GERAL</div>
+          <h2>Perguntas da discussão</h2>
+        </div>
+        <button id="closeOverviewBtn" class="overview-close" type="button">×</button>
+      </div>
+      <div id="overviewGrid" class="overview-grid"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="results.js"></script>
+</body>
+</html>
