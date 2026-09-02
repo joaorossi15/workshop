@@ -60,44 +60,63 @@
   function setStatus(text, live=false){ $('connectionStatus').textContent=text; $('connectionStatus').classList.toggle('live',live); }
   function splitAnswer(answer){ return String(answer).split(' || ').map(x=>x.trim()).filter(Boolean); }
 
-  // Usa exatamente o mesmo bridge da aplicação existente.
-  function bridgePost(payload){
-    return new Promise((resolve,reject)=>{
-      if(!API){ reject(new Error('APPS_SCRIPT_URL não configurada.')); return; }
-      const requestId='results_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const frameName='frame_'+requestId;
-      const iframe=document.createElement('iframe');
-      iframe.name=frameName; iframe.style.display='none'; iframe.setAttribute('aria-hidden','true');
-      const form=document.createElement('form');
-      form.method='POST'; form.action=API; form.target=frameName; form.style.display='none';
-      const fields={payload:JSON.stringify(payload),bridge:'1',requestId};
-      Object.entries(fields).forEach(([name,value])=>{
-        const input=document.createElement('input'); input.type='hidden'; input.name=name; input.value=value; form.appendChild(input);
-      });
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar os resultados.')),15000);
-      function onMessage(ev){
-        const msg=ev.data;
-        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
-        cleanup(null,msg.data);
-      }
-      function cleanup(err,data){
-        clearTimeout(timer); window.removeEventListener('message',onMessage); form.remove(); iframe.remove();
-        if(err) reject(err);
-        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
-        else resolve(data);
-      }
-      window.addEventListener('message',onMessage);
-      document.body.appendChild(iframe); document.body.appendChild(form);
-      try{ form.submit(); }catch(err){ cleanup(err); }
+  // Comunicação direta com o Apps Script.
+  // Usa POST com text/plain para manter a requisição simples e evitar preflight CORS.
+  async function call(payload){
+    if(!API){ return demoCall(payload); }
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
     });
+    if(!res.ok) throw new Error('Erro de rede: HTTP ' + res.status);
+    let data;
+    try{
+      data = await res.json();
+    }catch(_){
+      throw new Error('O Apps Script retornou uma resposta inválida.');
+    }
+    if(!data || data.ok === false) throw new Error((data && data.error) || 'Erro no servidor');
+    return data;
+  }
+
+  function demoCall(payload){
+    if(payload.action === 'state'){
+      return Promise.resolve({
+        ok:true,
+        currentRound:Number(localStorage.getItem('workshop_demo_round') || '0'),
+        sessionId:'demo',
+        status:'live'
+      });
+    }
+    if(payload.action === 'results'){
+      const arr = JSON.parse(localStorage.getItem('workshop_demo_responses') || '[]');
+      const round = Number(payload.round || 0);
+      const rows = arr.filter(x => Number(x.round) === round);
+      const grouped = {};
+      const participants = new Set();
+      rows.forEach(x => {
+        participants.add(x.participantId || x.participant || 'demo');
+        const qid = x.questionId || x.question || '';
+        if(!qid) return;
+        if(!grouped[qid]) grouped[qid] = [];
+        grouped[qid].push({answer:x.answer ?? x.value ?? ''});
+      });
+      return Promise.resolve({
+        ok:true,
+        participantCount:participants.size,
+        questions:Object.entries(grouped).map(([questionId,answers]) => ({questionId,answers}))
+      });
+    }
+    return Promise.resolve({ok:true});
   }
 
   async function loadAll(){
     $('loadingState').classList.remove('hidden'); $('emptyState').classList.add('hidden'); $('slide').classList.add('hidden');
     setStatus('consultando...');
     try{
-      state = await bridgePost({action:'state'});
-      const results = await Promise.all([1,2,3,4,5].map(round => bridgePost({action:'results',sessionId:state.sessionId,round:String(round)})));
+      state = await call({action:'state'});
+      const results = await Promise.all([1,2,3,4,5].map(round => call({action:'results',sessionId:state.sessionId,round:String(round)})));
       slides = [];
       results.forEach((data,idx)=>{
         const round = idx+1;
