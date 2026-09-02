@@ -35,38 +35,13 @@
 
   // Comunicação sem CORS/JSONP: carrega uma pequena página HTML do
   // Apps Script em um iframe invisível. Ela devolve o resultado com postMessage.
+  // v5: leituras também usam POST de formulário invisível.
+  // Evita GET /exec em iframe, que pode ser redirecionado para ServiceLogin
+  // em contexto de terceiros mesmo quando o Web App é público.
   function bridgeGet(params){
-    return new Promise((resolve,reject)=>{
-      const requestId='fac_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const iframe=document.createElement('iframe');
-      iframe.style.display='none';
-      iframe.setAttribute('aria-hidden','true');
-      const timer=setTimeout(()=>cleanup(new Error('Tempo esgotado ao consultar o Apps Script.')),12000);
-
-      function onMessage(ev){
-        const msg=ev.data;
-        if(!msg || msg.source!=='oficina-agentes-apps-script' || msg.requestId!==requestId) return;
-        cleanup(null,msg.data);
-      }
-      function cleanup(err,data){
-        clearTimeout(timer);
-        window.removeEventListener('message',onMessage);
-        iframe.remove();
-        if(err) reject(err);
-        else if(!data || data.ok===false) reject(new Error((data&&data.error)||'Erro no servidor'));
-        else resolve(data);
-      }
-      window.addEventListener('message',onMessage);
-      const q=new URLSearchParams({...params,bridge:'1',requestId,t:String(Date.now())});
-      iframe.src=API+'?'+q.toString();
-      iframe.onerror=()=>cleanup(new Error('Não foi possível abrir a ponte com o Apps Script.'));
-      document.body.appendChild(iframe);
-    });
+    return bridgePost({...params});
   }
 
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-
-  // POST via formulário para iframe invisível + confirmação por postMessage.
   function bridgePost(payload){
     return new Promise((resolve,reject)=>{
       const requestId='facpost_'+Date.now()+'_'+Math.random().toString(36).slice(2);
