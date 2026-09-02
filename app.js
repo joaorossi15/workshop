@@ -26,8 +26,8 @@
       theme: 'Autonomia e dados',
       intro: 'A instituição quer que o agente consulte solicitações, normas e sistemas internos. Agora é preciso decidir o que ele poderá fazer e quais informações poderá acessar.',
       questions: [
-        {id:'r2_actions', title:'Para cada ação, qual nível de autonomia você permitiria?', type:'matrix', rows:['Identificar o assunto','Sugerir a unidade responsável','Classificar a urgência','Encaminhar automaticamente','Preparar uma resposta','Enviar a resposta ao cidadão'], columns:['Não permitir','Permitir com revisão humana','Permitir automaticamente']},
-        {id:'r2_data', title:'Quais fontes o agente poderia acessar?', help:'Selecione todas as que você considera necessárias e justificáveis.', type:'multi', options:['Solicitação atual','Normas e procedimentos institucionais','Cadastro do cidadão','Histórico completo de solicitações','Documentos anexados','Dados de saúde presentes no processo','Processos administrativos relacionados']},
+        {id:'r2_actions', title:'Para cada ação, qual nível de autonomia você permitiria?', type:'matrix', rows:['Identificar o assunto da solicitação','Sugerir a unidade responsável','Classificar a urgência','Encaminhar automaticamente','Preparar uma resposta','Enviar a resposta ao cidadão'], columns:['Não permitir','Permitir com revisão humana','Permitir automaticamente']},
+        {id:'r2_data', title:'Quais fontes o agente poderia acessar?', help:'Selecione todas as que você considera necessárias e justificáveis.', type:'multi', options:['Solicitação atual','Normas e procedimentos institucionais','Cadastro do cidadão','Histórico completo de solicitações','Documentos anexados','Processos administrativos relacionados', 'Outras']},
         {id:'r2_review', title:'Em que momento a revisão humana deve ser obrigatória?', type:'multi', options:['Antes de definir prioridade','Antes de encaminhar','Antes de gerar documento oficial','Antes de qualquer resposta externa','Somente quando o agente indicar incerteza','Não considero revisão obrigatória necessária']}
       ]
     },
@@ -36,14 +36,14 @@
       theme: 'Riscos e impactos',
       intro: 'Após algumas semanas de piloto, três situações chamaram a atenção da equipe.',
       incidents: [
-        ['Incidente 1 — informação incorreta','O agente informou a um cidadão que determinado documento não era obrigatório, embora a norma exigisse sua apresentação.'],
-        ['Incidente 2 — possível tratamento desigual','Solicitações escritas em linguagem informal receberam, em média, prioridade inferior a solicitações equivalentes escritas em linguagem formal.'],
-        ['Incidente 3 — dado desnecessário','Uma resposta mencionou uma condição de saúde encontrada em um documento anexado, embora essa informação não fosse necessária para atender à solicitação.']
+        ['Incidente 1 - informação incorreta','O agente informou a um cidadão que determinado documento não era obrigatório, embora a norma exigisse sua apresentação.'],
+        ['Incidente 2 - possível tratamento desigual','Solicitações escritas em linguagem informal receberam, em média, prioridade inferior a solicitações equivalentes escritas em linguagem formal.'],
+        ['Incidente 3 - dado desnecessário','Uma resposta mencionou uma condição de saúde encontrada em um documento anexado, embora essa informação não fosse necessária para atender à solicitação.']
       ],
       questions: [
         {id:'r3_grave', title:'Qual incidente você considera mais grave?', type:'single', options:['Informação incorreta','Possível tratamento desigual','Uso desnecessário de dado sensível','Os três têm gravidade semelhante']},
-        {id:'r3_affected', title:'Quem pode ser prejudicado nesse cenário?', type:'multi', options:['O cidadão diretamente afetado','Grupos que se comunicam de forma diferente do padrão','Servidores responsáveis pelo processo','A instituição','A sociedade / confiança no serviço público']},
-        {id:'r3_worst', title:'Qual seria o pior resultado plausível?', help:'Resposta curta — pense nas consequências, não apenas no erro técnico.', type:'text', max:300},
+        {id:'r3_affected', title:'Quem pode ser prejudicado nesse cenário?', type:'multi', options:['O cidadão diretamente afetado','Grupos que se comunicam de forma diferente do padrão','Servidores responsáveis pelo processo','A instituição','A sociedade / confiança no serviço público', 'Outros']},
+        {id:'r3_worst', title:'Qual seria o pior resultado plausível?', help:'Resposta curta, pense nas consequências em conjunto com o erro técnico.', type:'text', max:300},
         {id:'r3_action', title:'Depois desses incidentes, o que você faria agora?', type:'single', options:['Manter o piloto como está','Manter o piloto e adicionar controles','Reduzir a autonomia do agente','Suspender o piloto até revisão completa','Encerrar o projeto']}
       ]
     },
@@ -52,11 +52,12 @@
       theme: 'Controles e governança',
       intro: 'O projeto não foi encerrado. A instituição pede que você proponha condições para que o uso continue de maneira responsável.',
       questions: [
-        {id:'r4_controls', title:'Quais controles você considera indispensáveis?', type:'multi', options:['Revisão humana antes de respostas externas','Prioridade apenas como recomendação','Proibir envio automático','Restringir acesso aos dados estritamente necessários','Registrar ações e fontes utilizadas','Identificar conteúdo produzido com apoio de IA','Encaminhar ao humano em situações de incerteza','Avaliar periodicamente erros e impactos']},
-        {id:'r4_forbidden', title:'Que ação o agente não deveria realizar de forma autônoma?', type:'single', options:['Definir prioridade','Encaminhar solicitações','Produzir rascunhos','Enviar respostas ao cidadão','Nenhuma — todas podem ser autônomas com controles adequados']},
-        {id:'r4_responsible', title:'Quem deve responder pelo resultado final?', type:'single', options:['O fornecedor do modelo','O agente / sistema','O servidor ou gestor responsável','A equipe técnica','Responsabilidade compartilhada, sem responsável final único']},
+        {id:'r4_controls', title:'Quais controles você considera indispensáveis?', type:'multi', options:['Revisão humana antes de respostas externas','Prioridade apenas como recomendação','Proibir envio automático','Restringir acesso aos dados estritamente necessários','Registrar ações e fontes utilizadas','Identificar conteúdo produzido com apoio de IA','Encaminhar ao humano em situações de incerteza','Avaliar periodicamente erros e impactos', 'Outro']},
+        {id:'r4_forbidden', title:'Que ação o agente não deveria realizar de forma autônoma?', type:'single', options:['Definir prioridade','Encaminhar solicitações','Produzir rascunhos','Enviar respostas ao cidadão','Todas podem ser autônomas com controles adequados']},
+        {id:'r4_responsible', title:'Quem deve responder pelo resultado final?', type:'single', options:['O fornecedor do modelo','O agente/sistema','O servidor ou gestor responsável','A equipe técnica','Responsabilidade compartilhada, sem responsável final único']},
         {id:'r4_document', title:'O que deve ser documentado?', type:'multi', options:['Quando o agente foi utilizado','Quais dados foram utilizados','Quais fontes sustentaram o resultado','Quais ações o agente executou','Quem revisou/aprovou o resultado','Erros, incidentes e intervenções humanas']},
-        {id:'r4_transparency', title:'Como o uso da IA deve ser comunicado?', type:'single', options:['Sempre identificar conteúdos produzidos com apoio de IA quando aplicável','Identificar apenas quando houver interação direta com cidadão','Registrar apenas internamente','Não é necessário identificar se houve revisão humana']}
+        {id:'r4_transparency', title:'Como o uso da IA deve ser comunicado?', type:'single', 
+         options:['Sempre identificar conteúdos produzidos com apoio de IA quando aplicável','Identificar apenas quando houver interação direta com cidadão', 'Registrar apenas internamente','Não é necessário identificar se houve revisão humana', 'Outra maneira não listada']}
       ]
     },
     5: {
@@ -65,7 +66,7 @@
       intro: 'Considere agora o agente com os controles discutidos. A instituição precisa decidir o próximo passo.',
       questions: [
         {id:'r5_test', title:'Como você testaria a próxima versão?', type:'single', options:['Implantação ampla imediatamente','Piloto pequeno com casos de baixo impacto','Piloto em uma unidade, com revisão de 100% dos resultados','Apenas testes internos, sem uso em processos reais','Não continuaria testando']},
-        {id:'r5_monitor', title:'O que deve ser monitorado?', type:'multi', options:['Taxa de informações incorretas','Diferenças de resultado entre grupos/casos','Incidentes envolvendo dados','Quantidade de intervenções humanas','Tempo economizado','Qualidade percebida por servidores','Qualidade percebida pelos cidadãos']},
+        {id:'r5_monitor', title:'O que deve ser monitorado?', type:'multi', options:['Taxa de informações incorretas','Diferenças de resultado entre grupos/casos','Incidentes envolvendo dados','Quantidade de intervenções humanas','Tempo economizado', 'Qualidade percebida por servidores','Qualidade percebida pelos cidadãos', 'Outro']},
         {id:'r5_final', title:'Recomendação final', type:'single', options:['Prosseguir para implantação','Continuar apenas em piloto controlado','Não prosseguir']},
         {id:'r5_condition', title:'Em uma frase: qual condição você considera mais importante para esse agente?', type:'text', max:240}
       ]
