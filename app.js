@@ -17,9 +17,7 @@
       theme: 'Adequação e benefício',
       intro: 'Uma instituição recebe grande volume de solicitações de cidadãos. Servidores precisam ler cada solicitação, identificar o assunto, avaliar a urgência, localizar a unidade responsável e preparar o encaminhamento.',
       questions: [
-        {id:'r1_problem', title:'Qual é o problema principal que esse projeto tenta resolver?', type:'single', options:['Tempo gasto em tarefas repetitivas','Dificuldade de encaminhar corretamente','Baixa consistência no atendimento','Outro problema']},
-        {id:'r1_benefit', title:'Qual seria o principal benefício esperado?', type:'single', options:['Reduzir tempo de processamento','Aumentar consistência','Liberar servidores para tarefas mais complexas','Melhorar a experiência do cidadão','Outro']},
-        {id:'r1_needed', title:'Um agente de IA é realmente necessário?', help:'Pense se uma automação tradicional ou outra solução mais simples poderia resolver o problema.', type:'single', options:['Sim','Talvez — preciso de mais informações','Não']},
+        {id:'r1_needed', title:'Um agente de IA é realmente necessário neste caso?', help:'Pense se uma automação tradicional ou outra solução mais simples poderia resolver o problema.', type:'single', options:['Sim','Talvez — preciso de mais informações','Não']},
         {id:'r1_initial', title:'Com o que você sabe agora, qual é sua recomendação?', type:'single', options:['Prosseguir','Prosseguir com cautela','Não prosseguir']}
       ]
     },
